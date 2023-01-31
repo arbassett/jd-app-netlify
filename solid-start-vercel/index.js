@@ -137,7 +137,7 @@ export default function ({ edge, prerender } = {}) {
       });
 
       const renderFuncEntrypoint = new URL(
-        `./index.${edge ? "c" : ""}js`,
+        `./index.${edge ? "" : "c"}js`,
         outputDir
       ); // join(renderFuncDir, renderEntrypoint);
       const renderFuncDir = new URL(
@@ -227,7 +227,7 @@ export default function ({ edge, prerender } = {}) {
         });
 
         const apiFuncEntrypoint = new URL(
-          `./index.${edge ? "c" : ""}js`,
+          `./index.${edge ? "" : "c"}js`,
           outputDir
         ); // join(apiFuncDir, apiEntrypoint);
         const apiFuncDir = new URL("./functions/api.func/", vercelOutputDir); // join(outputDir, "functions/api.func");
