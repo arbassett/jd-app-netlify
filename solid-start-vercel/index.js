@@ -136,7 +136,10 @@ export default function ({ edge, prerender } = {}) {
         ],
       });
 
-      const renderFuncEntrypoint = new URL(`./index.js`, outputDir); // join(renderFuncDir, renderEntrypoint);
+      const renderFuncEntrypoint = new URL(
+        `./index.${edge ? "c" : ""}js`,
+        outputDir
+      ); // join(renderFuncDir, renderEntrypoint);
       const renderFuncDir = new URL(
         "./functions/render.func/",
         vercelOutputDir
@@ -159,14 +162,12 @@ export default function ({ edge, prerender } = {}) {
       await bundle.close();
 
       const cache = Object.create(null);
-
       const renderBaseUrl = await copyDependencies({
         entry: renderFuncEntrypoint,
         outputDir: renderFuncDir,
         workingDir,
         cache,
       });
-
       const renderConfig = edge
         ? {
             runtime: "edge",
@@ -225,7 +226,10 @@ export default function ({ edge, prerender } = {}) {
           ],
         });
 
-        const apiFuncEntrypoint = new URL(`./index.js`, outputDir); // join(apiFuncDir, apiEntrypoint);
+        const apiFuncEntrypoint = new URL(
+          `./index.${edge ? "c" : ""}js`,
+          outputDir
+        ); // join(apiFuncDir, apiEntrypoint);
         const apiFuncDir = new URL("./functions/api.func/", vercelOutputDir); // join(outputDir, "functions/api.func");
         await bundle.write(
           edge
@@ -243,16 +247,12 @@ export default function ({ edge, prerender } = {}) {
         );
         await bundle.close();
 
-        console.log("apiFuncEntrypoint", apiFuncEntrypoint.pathname);
-        console.log("apiFuncDir", apiFuncDir.pathname);
-
         const apiBaseUrl = await copyDependencies({
           entry: apiFuncEntrypoint,
           outputDir: apiFuncDir,
           workingDir,
           cache,
         });
-
         const apiConfig = edge
           ? {
               runtime: "edge",
