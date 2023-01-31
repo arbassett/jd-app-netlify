@@ -28,6 +28,7 @@ specifiers:
   solid-start: ^0.2.16
   solid-start-node: ^0.2.16
   solid-start-trpc: ^0.0.16
+  solid-start-vercel: 0.2.17
   solid-trpc: 0.1.0-sssr.2
   tailwindcss: ^3.2.4
   terser: ^5.16.1
@@ -70,6 +71,7 @@ devDependencies:
   postcss: 8.4.21
   prisma: 4.9.0
   solid-start-node: 0.2.17_zn5wc3obuibtwf7x44ixuamloy
+  solid-start-vercel: 0.2.17_hlg5cm6fpjgju33tt2rnkcpiy4
   tailwindcss: 3.2.4_postcss@8.4.21
   typescript: 4.9.5
   vite: 3.2.5_ndrtoknlsrlxoi7jhrc2iwbpca
@@ -4223,6 +4225,21 @@ packages:
       solid-js: 1.6.10
       solid-start: 0.2.17_xkldvgorozr2rd64n7towncbfe
     dev: false
+
+  /solid-start-vercel/0.2.17_hlg5cm6fpjgju33tt2rnkcpiy4:
+    resolution: {integrity: sha512-Wfjws1zfsjq1lUdC4dLaHfrKOyREukPQD51PPTrzqTpWVwtTKXpFemop8Ve45/yQ52x9XSHu22gCb3Pbsox/fg==}
+    peerDependencies:
+      solid-start: '*'
+      vite: '*'
+    dependencies:
+      '@rollup/plugin-commonjs': 24.0.1_rollup@3.12.0
+      '@rollup/plugin-json': 6.0.0_rollup@3.12.0
+      '@rollup/plugin-node-resolve': 13.3.0_rollup@3.12.0
+      rollup: 3.12.0
+      solid-start: 0.2.17_xkldvgorozr2rd64n7towncbfe
+      terser: 5.16.2
+      vite: 3.2.5_ndrtoknlsrlxoi7jhrc2iwbpca
+    dev: true
 
   /solid-start/0.2.17_xkldvgorozr2rd64n7towncbfe:
     resolution: {integrity: sha512-zo4wI+dWzvXblM50xO9MvfoMGeAwpCRp3xcFlgHZmaQP6LrhhFj/e8/VfxOB974zyV3QBZxDWD8rdvRLEz0t7g==}
