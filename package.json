@@ -2,7 +2,7 @@
   "name": "jd-app",
   "scripts": {
     "dev": "solid-start dev",
-    "build": "solid-start build && ls -la .vercel/output",
+    "build": "solid-start build && tree .vercel",
     "start": "solid-start start",
     "lint": "eslint --fix \"**/*.{ts,tsx,js,jsx}\"",
     "push": "prisma db push",
