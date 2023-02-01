@@ -5,7 +5,8 @@
     "start": "solid-start start",
     "lint": "eslint --fix \"**/*.{ts,tsx,js,jsx}\"",
     "push": "prisma db push",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "postbuild": "cp node_modules/.pnpm/**/**/prisma/*engine*.node .vercel/output/functions/render.func/ && cp prisma/schema.prisma .vercel/output/functions/render.func/ && cp node_modules/.pnpm/**/**/prisma/*engine*.node .vercel/output/functions/api.func/ && cp prisma/schema.prisma .vercel/output/functions/api.func/"
   },
   "type": "module",
   "devDependencies": {
