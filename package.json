@@ -1,7 +1,7 @@
 {
   "name": "jd-app",
   "scripts": {
-    "build": "solid-start build",
+    "build": "solid-start build && pnpm postbuild",
     "start": "solid-start start",
     "lint": "eslint --fix \"**/*.{ts,tsx,js,jsx}\"",
     "push": "prisma db push",
