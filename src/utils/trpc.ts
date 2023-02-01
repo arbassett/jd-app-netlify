@@ -5,6 +5,7 @@ import { httpBatchLink } from "@trpc/client";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") return "";
+  if(process.env.NODE_ENV === "production") return "https://jd-app-phi.vercel.app";
   return `http://localhost:${process.env.PORT ?? 5173}`;
 };
 
