@@ -21,6 +21,8 @@ specifiers:
   directory-tree: ^3.5.1
   eslint: ^8.27.0
   eslint-plugin-solid: ^0.9.3
+  fast-glob: 3.2.12
+  micromatch: 4.0.5
   postcss: ^8.4.19
   prisma: ^4.6.1
   rollup: ^3.10.0
@@ -52,6 +54,8 @@ dependencies:
   '@trpc/server': 10.9.1
   '@vercel/nft': 0.22.6
   directory-tree: 3.5.1
+  fast-glob: 3.2.12
+  micromatch: 4.0.5
   rollup: 3.12.0
   solid-js: 1.6.10
   solid-start: 0.2.17_xkldvgorozr2rd64n7towncbfe

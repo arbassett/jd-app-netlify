@@ -45,7 +45,9 @@
     "solid-trpc": "0.1.0-sssr.2",
     "terser": "^5.16.1",
     "undici": "5.11.0",
-    "zod": "^3.19.1"
+    "zod": "^3.19.1",
+    "fast-glob": "3.2.12",
+    "micromatch": "4.0.5"
   },
   "engines": {
     "node": ">=16"

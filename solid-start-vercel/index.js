@@ -5,42 +5,56 @@ import json from "@rollup/plugin-json";
 import nodeResolve from "@rollup/plugin-node-resolve";
 import { nodeFileTrace } from "@vercel/nft";
 import { spawn } from "child_process";
-import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "fs";
+import glob from "fast-glob";
+import {
+  copyFileSync,
+  lstatSync,
+  mkdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from "fs";
+import mm from "micromatch";
 import { dirname, join, relative } from "path";
 import process from "process";
 import { rollup } from "rollup";
 import { fileURLToPath, pathToFileURL } from "url";
+
+const emptyDir = dir => {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+};
 
 /***
  * @param {object} options
  * @param {URL} options.entry
  * @param {URL} options.outputDir
  * @param {URL} options.workingDir
+ * @param {string | string[] | undefined} options.includes
+ * @param {string | string[] | undefined} options.excludes
+ * @param {URL} options. workingDir
  * @param {object} options.cache
  *
- * @returns {Promise<URL>}
+ * @returns {Promise<URL>} returns the base directory used for the nft within the outputDir
  * Implemtation based on astro vercel adapter https://github.com/withastro/astro/blob/474ecc7be625a0ff2e9bc145af948e75826de025/packages/integrations/vercel/src/lib/nft.ts#L7
  *
  */
-const copyDependencies = async ({ entry, outputDir, workingDir, cache }) => {
+const copyDependencies = async ({ entry, outputDir, includes, excludes, workingDir, cache }) => {
   let base = entry;
   while (fileURLToPath(base) !== fileURLToPath(new URL("../", base))) {
     base = new URL("../", base);
   }
 
-  const { fileList, warnings, reasons } = await nodeFileTrace(
-    [fileURLToPath(entry)],
-    {
-      cache,
-      processCwd: process.cwd(),
-      base: fileURLToPath(base),
-    }
-  );
+  const { fileList, warnings, reasons } = await nodeFileTrace([fileURLToPath(entry)], {
+    cache,
+    processCwd: fileURLToPath(workingDir),
+    base: fileURLToPath(base)
+  });
 
   for (const error of warnings) {
     if (error.message.startsWith("Failed to resolve dependency")) {
-      const [, module, file] =
-        /Cannot find module '(.+?)' loaded from (.+)/.exec(error.message);
+      const [, module, file] = /Cannot find module '(.+?)' loaded from (.+)/.exec(error.message);
 
       if (fileURLToPath(entry) === file) {
         console.warn(
@@ -54,22 +68,45 @@ const copyDependencies = async ({ entry, outputDir, workingDir, cache }) => {
     }
   }
 
-  // TODO: handle user includes and excludes
-  const results = [...fileList];
+  if (includes) {
+    const entries = glob
+      .sync(includes, { cwd: fileURLToPath(workingDir) })
+      .map(p => relative(fileURLToPath(base), fileURLToPath(new URL(p, workingDir))));
+    // dedup the entries from what nft finds
+    for (const entry of entries) {
+      fileList.add(entry);
+    }
+  }
+
+  let results = [...fileList];
+
+  if (excludes) {
+    results = mm.not(results, excludes, { dot: true });
+  }
 
   for (const file of results) {
-    // Create directories recursively
-    mkdirSync(dirname(fileURLToPath(new URL(file, outputDir))), {
-      recursive: true,
-    });
-
-    // convert the none absolute path to absolute path
+    // convert the relative path to absolute path
     const source = new URL(file, base);
     const target = new URL(file, outputDir);
+    const stats = lstatSync(source);
 
-    // TODO: handle symlinks
+    // Create directories recursively
+    mkdirSync(dirname(fileURLToPath(target)), {
+      recursive: true
+    });
 
-    copyFileSync(source, target);
+    if (stats.isSymbolicLink()) {
+      const realPath = realpathSync(source);
+      const realdest = new URL(relative(fileURLToPath(base), realPath), outputDir);
+
+      symlinkSync(
+        relative(dirname(fileURLToPath(target)), fileURLToPath(realdest)),
+        target,
+        "file"
+      );
+    } else {
+      copyFileSync(source, target);
+    }
   }
 
   return base;
@@ -79,8 +116,10 @@ const copyDependencies = async ({ entry, outputDir, workingDir, cache }) => {
  * @param {object} options
  * @param {boolean} [options.edge]
  * @param {object} [options.prerender]
+ * @param {string | string[]} [options.includes]
+ * @param {string | string[]} [options.excludes]
  */
-export default function ({ edge, prerender } = {}) {
+export default function ({ edge, prerender, includes, excludes } = {}) {
   return {
     name: "vercel",
     async start() {
@@ -99,21 +138,20 @@ export default function ({ edge, prerender } = {}) {
       const outputDir = new URL("./dist/", workingDir); // join(config.root, ".vercel/output");
       const solidServerDir = new URL("./.solid/server/", workingDir); //  join(config.root, "./.solid/server/");
 
+      // start with fresh directories
+      emptyDir(vercelOutputDir);
+      emptyDir(outputDir);
+      emptyDir(solidServerDir);
+
       // SSR Edge Function
       if (!config.solidOptions.ssr) {
-        await builder.spaClient(
-          fileURLToPath(new URL("./static/", vercelOutputDir))
-        ); // join(outputDir, "static")
+        await builder.spaClient(fileURLToPath(new URL("./static/", vercelOutputDir))); // join(outputDir, "static")
         await builder.server(fileURLToPath(solidServerDir)); // join(config.root, ".solid", "server")
       } else if (config.solidOptions.islands) {
-        await builder.islandsClient(
-          fileURLToPath(new URL("./static/", vercelOutputDir))
-        ); // join(outputDir, "static")
+        await builder.islandsClient(fileURLToPath(new URL("./static/", vercelOutputDir))); // join(outputDir, "static")
         await builder.server(fileURLToPath(solidServerDir)); // join(config.root, ".solid", "server")
       } else {
-        await builder.client(
-          fileURLToPath(new URL("./static/", vercelOutputDir))
-        ); // join(outputDir, "static")
+        await builder.client(fileURLToPath(new URL("./static/", vercelOutputDir))); // join(outputDir, "static")
         await builder.server(fileURLToPath(solidServerDir)); // join(config.root, ".solid", "server")
       }
 
@@ -130,33 +168,27 @@ export default function ({ edge, prerender } = {}) {
           json(),
           nodeResolve({
             preferBuiltins: true,
-            exportConditions: edge ? ["worker", "solid"] : ["node", "solid"],
+            exportConditions: edge ? ["worker", "solid"] : ["node", "solid"]
           }),
-          common({ strictRequires: true, ...config.build.commonjsOptions }),
-        ],
+          common({ strictRequires: true, ...config.build.commonjsOptions })
+        ]
       });
 
-      const renderFuncEntrypoint = new URL(
-        `./index.${edge ? "" : "c"}js`,
-        outputDir
-      ); // join(renderFuncDir, renderEntrypoint);
-      const renderFuncDir = new URL(
-        "./functions/render.func/",
-        vercelOutputDir
-      ); // join(outputDir, "functions/render.func");
+      const renderFuncEntrypoint = new URL(`./index.${edge ? "mjs" : "cjs"}`, outputDir); // join(renderFuncDir, renderEntrypoint);
+      const renderFuncDir = new URL("./functions/render.func/", vercelOutputDir); // join(outputDir, "functions/render.func");
       mkdirSync(renderFuncDir, { recursive: true });
       await bundle.write(
         edge
           ? {
               format: "esm",
               file: fileURLToPath(renderFuncEntrypoint), // join(renderFuncDir, renderEntrypoint)
-              inlineDynamicImports: true,
+              inlineDynamicImports: true
             }
           : {
               format: "cjs",
               file: fileURLToPath(renderFuncEntrypoint), // join(renderFuncDir, renderEntrypoint)
               exports: "auto",
-              inlineDynamicImports: true,
+              inlineDynamicImports: true
             }
       );
       await bundle.close();
@@ -165,24 +197,20 @@ export default function ({ edge, prerender } = {}) {
       const renderBaseUrl = await copyDependencies({
         entry: renderFuncEntrypoint,
         outputDir: renderFuncDir,
+        includes,
+        excludes,
         workingDir,
-        cache,
+        cache
       });
       const renderConfig = edge
         ? {
             runtime: "edge",
-            entrypoint: relative(
-              fileURLToPath(renderBaseUrl),
-              fileURLToPath(renderFuncEntrypoint)
-            ),
+            entrypoint: relative(fileURLToPath(renderBaseUrl), fileURLToPath(renderFuncEntrypoint))
           }
         : {
             runtime: "nodejs16.x",
-            handler: relative(
-              fileURLToPath(renderBaseUrl),
-              fileURLToPath(renderFuncEntrypoint)
-            ),
-            launcherType: "Nodejs",
+            handler: relative(fileURLToPath(renderBaseUrl), fileURLToPath(renderFuncEntrypoint)),
+            launcherType: "Nodejs"
           };
 
       writeFileSync(
@@ -193,11 +221,11 @@ export default function ({ edge, prerender } = {}) {
 
       // Generate API function
       const apiRoutes = config.solidOptions.router.getFlattenedApiRoutes();
-      const apiRoutesConfig = apiRoutes.map((route) => {
+      const apiRoutesConfig = apiRoutes.map(route => {
         return {
           src: route.path
             .split("/")
-            .map((path) =>
+            .map(path =>
               path[0] === ":"
                 ? `(?<${path.slice(1)}>[^/]+)`
                 : path[0] === "*"
@@ -205,7 +233,7 @@ export default function ({ edge, prerender } = {}) {
                 : path
             )
             .join("/"),
-          dest: "/api",
+          dest: "/api"
         };
       });
       if (apiRoutes.length > 0) {
@@ -220,29 +248,26 @@ export default function ({ edge, prerender } = {}) {
             json(),
             nodeResolve({
               preferBuiltins: true,
-              exportConditions: edge ? ["worker", "solid"] : ["node", "solid"],
+              exportConditions: edge ? ["worker", "solid"] : ["node", "solid"]
             }),
-            common({ strictRequires: true, ...config.build.commonjsOptions }),
-          ],
+            common({ strictRequires: true, ...config.build.commonjsOptions })
+          ]
         });
 
-        const apiFuncEntrypoint = new URL(
-          `./index.${edge ? "" : "c"}js`,
-          outputDir
-        ); // join(apiFuncDir, apiEntrypoint);
+        const apiFuncEntrypoint = new URL(`./index.${edge ? "mjs" : "cjs"}`, outputDir); // join(apiFuncDir, apiEntrypoint);
         const apiFuncDir = new URL("./functions/api.func/", vercelOutputDir); // join(outputDir, "functions/api.func");
         await bundle.write(
           edge
             ? {
                 format: "esm",
                 file: fileURLToPath(apiFuncEntrypoint), // join(apiFuncDir, apiEntrypoint)
-                inlineDynamicImports: true,
+                inlineDynamicImports: true
               }
             : {
                 format: "cjs",
                 file: fileURLToPath(apiFuncEntrypoint), // join(apiFuncDir, apiEntrypoint)
                 exports: "auto",
-                inlineDynamicImports: true,
+                inlineDynamicImports: true
               }
         );
         await bundle.close();
@@ -250,30 +275,23 @@ export default function ({ edge, prerender } = {}) {
         const apiBaseUrl = await copyDependencies({
           entry: apiFuncEntrypoint,
           outputDir: apiFuncDir,
+          includes,
+          excludes,
           workingDir,
-          cache,
+          cache
         });
         const apiConfig = edge
           ? {
               runtime: "edge",
-              entrypoint: relative(
-                fileURLToPath(apiBaseUrl),
-                fileURLToPath(apiFuncEntrypoint)
-              ),
+              entrypoint: relative(fileURLToPath(apiBaseUrl), fileURLToPath(apiFuncEntrypoint))
             }
           : {
               runtime: "nodejs16.x",
-              handler: relative(
-                fileURLToPath(apiBaseUrl),
-                fileURLToPath(apiFuncEntrypoint)
-              ),
-              launcherType: "Nodejs",
+              handler: relative(fileURLToPath(apiBaseUrl), fileURLToPath(apiFuncEntrypoint)),
+              launcherType: "Nodejs"
             };
 
-        writeFileSync(
-          new URL("./.vc-config.json", apiFuncDir),
-          JSON.stringify(apiConfig, null, 2)
-        ); // join(apiFuncDir, ".vc-config.json")
+        writeFileSync(new URL("./.vc-config.json", apiFuncDir), JSON.stringify(apiConfig, null, 2)); // join(apiFuncDir, ".vc-config.json")
         rmSync(outputDir, { recursive: true, force: true });
       }
       // Routing Config
@@ -285,7 +303,7 @@ export default function ({ edge, prerender } = {}) {
           {
             src: "/assets/(.*)",
             headers: { "Cache-Control": "public, max-age=31556952, immutable" },
-            continue: true,
+            continue: true
           },
           // Serve any matching static assets first
           { handle: "filesystem" },
@@ -294,9 +312,9 @@ export default function ({ edge, prerender } = {}) {
           // Invoke the SSR function if not a static asset
           {
             src: prerender ? "/(?<path>.*)" : "/.*",
-            dest: prerender ? "/render?path=$path" : "/render",
-          },
-        ],
+            dest: prerender ? "/render?path=$path" : "/render"
+          }
+        ]
       };
       writeFileSync(
         new URL("./config.json", vercelOutputDir),
@@ -309,13 +327,13 @@ export default function ({ edge, prerender } = {}) {
           expiration: prerender?.expiration ?? false,
           group: 1,
           bypassToken: prerender?.bypassToken,
-          allowQuery: ["path"],
+          allowQuery: ["path"]
         };
         writeFileSync(
           new URL("./functions/render.prerender-config.json", vercelOutputDir), //join(outputDir, "functions/render.prerender-config.json")
           JSON.stringify(prerenderConfig, null, 2)
         );
       }
-    },
+    }
   };
 }
